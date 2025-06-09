@@ -19,6 +19,34 @@ pipeline {
             }
         }
 
+        stage('Create Jenkins ServiceAccount') {
+            steps {
+                withKubeConfig(credentialsId: 'kubeconfig-id') {
+                    writeFile file: 'k8s/jenkins-sa.yaml', text: '''
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-deployer
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-deployer-binding
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: kube-system
+'''
+                    sh 'kubectl apply -f k8s/jenkins-sa.yaml'
+                }
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 withKubeConfig(credentialsId: 'kubeconfig-id') {
