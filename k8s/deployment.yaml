@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blog
+  template:
+    metadata:
+      labels:
+        app: blog
+    spec:
+      containers:
+      - name: blog
+        image: nginx:latest
+        volumeMounts:
+        - name: html-volume
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html-volume
+        configMap:
+          name: blog-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blog-html
+data:
+  index.html: |
+    <html><body><h1>CI/CD Deployed Blog</h1></body></html>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blog-service
+spec:
+  type: NodePort
+  selector:
+    app: blog
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
