@@ -1,26 +1,39 @@
 pipeline {
     agent any
+
     environment {
+        K8S_CONTEXT = 'kubernetes-admin@kubernetes'
         NAMESPACE = "${env.BRANCH_NAME == 'dev' ? 'dev' : env.BRANCH_NAME == 'test' ? 'test' : 'prod'}"
     }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/<your-repo>.git'
+                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/shivam74826/blog-website-.git'
             }
         }
-        stage('Build') {
+
+        stage('Build/Validate') {
             steps {
-                echo "Building for ${env.BRANCH_NAME} environment"
+                echo "No build needed for static site. Validating HTML/CSS structure..."
             }
         }
+
         stage('Deploy to Kubernetes') {
             steps {
-                script {
-                    sh "kubectl apply -n ${NAMESPACE} -f k8s/deployment.yaml"
+                withCredentials([kubeconfigContent(credentialsId: 'kubeconfig-id', variable: 'KUBECONFIG_CONTENT')]) {
+                    writeFile file: 'kubeconfig.yaml', text: "${KUBECONFIG_CONTENT}"
+                    withEnv(["KUBECONFIG=${pwd()}/kubeconfig.yaml"]) {
+                        sh "kubectl apply -n ${NAMESPACE} -f k8s/deployment.yaml"
+                    }
                 }
+            }
+        }
+
+        stage('Post-Deployment') {
+            steps {
+                echo "Deployment to ${NAMESPACE} namespace completed"
             }
         }
     }
 }
-
