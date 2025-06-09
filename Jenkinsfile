@@ -13,43 +13,46 @@ pipeline {
             }
         }
 
+        stage('Create Jenkins Service Account') {
+            steps {
+                script {
+                    def saYaml = '''\
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-admin
+subjects:
+- kind: ServiceAccount
+  name: jenkins
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+'''
+                    writeFile file: 'k8s/jenkins-sa.yaml', text: saYaml
+                }
+                withKubeConfig([credentialsId: 'kubeconfig-id']) {
+                    sh 'kubectl apply -f k8s/jenkins-sa.yaml --validate=false'
+                }
+            }
+        }
+
         stage('Build/Validate') {
             steps {
                 echo "No build needed for static site. Validating HTML/CSS structure..."
             }
         }
 
-        stage('Create Jenkins ServiceAccount') {
-            steps {
-                withKubeConfig(credentialsId: 'kubeconfig-id') {
-                    writeFile file: 'k8s/jenkins-sa.yaml', text: '''
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: jenkins-deployer
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: jenkins-deployer-binding
-roleRef:
-  kind: ClusterRole
-  name: cluster-admin
-  apiGroup: rbac.authorization.k8s.io
-subjects:
-  - kind: ServiceAccount
-    name: jenkins-deployer
-    namespace: kube-system
-'''
-                    sh 'kubectl apply -f k8s/jenkins-sa.yaml'
-                }
-            }
-        }
-
         stage('Deploy to Kubernetes') {
             steps {
-                withKubeConfig(credentialsId: 'kubeconfig-id') {
+                withKubeConfig([credentialsId: 'kubeconfig-id']) {
                     sh "kubectl apply -n ${NAMESPACE} -f k8s/deployment.yaml"
                 }
             }
@@ -57,7 +60,7 @@ subjects:
 
         stage('Post-Deployment') {
             steps {
-                echo "Deployment to ${NAMESPACE} namespace completed"
+                echo "✅ Deployment to ${NAMESPACE} namespace completed!"
             }
         }
     }
